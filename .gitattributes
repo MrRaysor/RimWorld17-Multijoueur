@@ -1,0 +1,3 @@
+# Keep the exact bytes: CRLF for cmd, UTF-8 BOM for Windows PowerShell 5.1.
+*.bat -text
+*.ps1 -text
