@@ -11,17 +11,27 @@ sont installés par un petit installateur.
 2. **Les mods du groupe** : RimWorld fermé, télécharge
    [**Installer.bat**](https://github.com/MrRaysor/RimWorld17-Multijoueur/releases/latest/download/Installer.bat)
    et double-clique dessus. Si Windows affiche « Windows a protégé votre ordinateur », clique sur
-   « Informations complémentaires » puis « Exécuter quand même ». Il trouve RimWorld tout seul et installe les mods
-   qui ne sont pas sur le Workshop. Il doit finir par « Terminé ! ».
-3. **La liste de mods** : dans RimSort, menu `File` → `Import` → `From Rentry.co`, colle le lien envoyé par Raysor
-   (ou `File` → `Open Mod List…` s'il t'a envoyé un fichier). RimSort signale les mods manquants : choisis
-   **Download with Steam client** (Steam ouvert) et attends la fin des téléchargements. Clique ensuite sur `Save`,
-   puis lance le jeu avec `Run`.
+   « Informations complémentaires » puis « Exécuter quand même ». Il trouve RimWorld tout seul, installe les mods
+   qui ne sont pas sur le Workshop, puis écrit la liste de mods de Raysor dans le jeu.
+3. **Les mods du Workshop** : la première fois, il en manque beaucoup. Ouvre RimSort (sans lancer RimWorld) : il
+   signale les mods manquants de la liste ; choisis **Download with Steam client** (Steam ouvert) et attends la fin
+   des téléchargements. Relance ensuite `Installer.bat` : il doit finir par « Prêt ».
 
-## Mises à jour
+## Avant chaque session
 
-Quand Raysor annonce une mise à jour : relance `Installer.bat` (il ne retélécharge que ce qui a changé), puis
-laisse Steam mettre à jour les mods du Workshop avant de jouer. Tout le monde doit avoir exactement les mêmes versions.
+Raysor publie sa session (sa liste de mods, ses réglages de mods et la version de chacun de ses mods du Workshop).
+RimWorld fermé, relance `Installer.bat`. Il :
+
+- met à jour les mods du groupe (il ne retélécharge que ce qui a changé) ;
+- écrit la liste de mods de Raysor, dans le même ordre ;
+- recopie ses réglages de mods (ceux que Multiplayer compare ; tes réglages personnels, comme la caméra ou
+  l'interface, ne changent pas) ;
+- compare la version de chaque mod du Workshop avec celle de Raysor : s'il y a une différence, il propose de les
+  faire retélécharger par Steam (Steam redémarre tout seul) ; s'il manque un mod, il propose d'ouvrir sa page Steam.
+
+Il doit finir par « Prêt ». Sinon, il dit quoi faire. Les fichiers qu'il remplace sont d'abord copiés dans le
+dossier `Sauvegardes session`, à côté de `Config` dans
+`%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`.
 
 ## Pour jouer
 
@@ -52,8 +62,8 @@ connectent. En multifaction, ne pas utiliser « tout autoriser » d'**Allow Tool
 | Vehicle Framework (1.7 dev build) | Pour les mods de véhicules (sans effet s'il n'est pas activé dans la liste). |
 | Exodia Mechanoids, Mecha Outposts, Raysor - Faction Leader Fix, Raysor - Loadout Fix | Les mods de Raysor. |
 
-L'installateur ne touche qu'à ces dossiers du dossier `Mods` de RimWorld : ni aux autres mods, ni aux sauvegardes,
-ni à la liste de mods.
+Dans le dossier `Mods` de RimWorld, l'installateur ne touche qu'à ces dossiers. Il aligne aussi la liste de mods et
+les réglages de mods sur ceux de Raysor (avec une copie de sauvegarde), et ne touche jamais aux parties sauvegardées.
 
 ## Licences et sources
 

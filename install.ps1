@@ -1,15 +1,19 @@
 ﻿<#
-Installe ou met à jour les mods locaux du groupe pour RimWorld 1.7 multijoueur (les mods absents du Steam Workshop).
-Lancé par Installer.bat (double-clic) ; le relancer à chaque mise à jour annoncée par Raysor.
+Installe ou met à jour les mods locaux du groupe pour RimWorld 1.7 multijoueur (les mods absents du Steam Workshop),
+puis applique la session de Raysor (session.ps1) : sa liste de mods, ses réglages de mods et ses versions des mods du
+Workshop. Lancé par Installer.bat (double-clic) ; le relancer avant chaque session, RimWorld fermé.
 
 Il trouve RimWorld via Steam, télécharge la dernière version du modpack sur GitHub et remplace chaque mod dans le dossier
-Mods du jeu. Il ne touche pas aux autres mods, ni aux sauvegardes, ni à la liste de mods, ni aux dossiers de
-développement (dossier lié, ou qui contient Source ou .git).
+Mods du jeu. Il ne touche pas aux autres mods, ni aux sauvegardes, ni aux dossiers de développement (dossier lié, ou qui
+contient Source ou .git).
+Tests : -SessionScript (session.ps1 local au lieu de GitHub) et -SessionArgs (ses paramètres de test).
 #>
 param(
     [string]$RimWorldPath = '',
     [string]$BaseUrl = 'https://github.com/MrRaysor/RimWorld17-Multijoueur/releases/latest/download',
-    [switch]$DetectOnly
+    [switch]$DetectOnly,
+    [string]$SessionScript = '',
+    [hashtable]$SessionArgs = @{}
 )
 
 $ErrorActionPreference = 'Stop'
@@ -177,9 +181,23 @@ foreach ($id in $WorkshopCopies.Keys) {
 }
 
 Say ''
-if ($failed -eq 0) {
-    Say 'Terminé ! Les mods du groupe sont installés.' Green
-    Say 'Étape suivante : dans RimSort, importe la liste de mods de Raysor (voir la page du modpack).'
-} else {
+if ($failed -gt 0) {
     Say "Il y a eu $failed problème(s) : vérifie ta connexion et relance l'installateur." Red
+    return
+}
+Say 'Les mods du groupe sont installés.' Green
+
+# Then Raysor's session: his mod list, mod settings and Workshop versions (session.ps1, next to this script).
+try {
+    if ($SessionScript) {
+        $code = [IO.File]::ReadAllText($SessionScript, [Text.Encoding]::UTF8)
+    } else {
+        $client = New-Object Net.WebClient
+        $client.Encoding = [Text.Encoding]::UTF8
+        $client.Headers['User-Agent'] = 'RimWorld17-Multijoueur-installer'
+        try { $code = $client.DownloadString('https://raw.githubusercontent.com/MrRaysor/RimWorld17-Multijoueur/main/session.ps1') } finally { $client.Dispose() }
+    }
+    & ([scriptblock]::Create($code.TrimStart([char]0xFEFF))) -RimWorldPath $rw @SessionArgs
+} catch {
+    Say "La session de Raysor n'a pas pu être appliquée : $($_.Exception.Message)" Red
 }
