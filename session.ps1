@@ -134,6 +134,18 @@ function Read-WorkshopRecord([string]$Library) {
     return $record
 }
 
+# Version of a copy in the Mods folder that is a link into another Steam or SteamCMD library (RimSort makes them so),
+# from that library's record; $null when the copy is a plain folder.
+function Get-LinkedManifest([string]$Folder) {
+    $item = Get-Item -LiteralPath $Folder -Force -ErrorAction SilentlyContinue
+    if (-not $item -or -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $null }
+    $m = [regex]::Match([string](@($item.Target)[0]), '^(?:\\\\\?\\)?(.*)\\steamapps\\workshop\\content\\294100\\(\d+)\\?$', 'IgnoreCase')
+    if (-not $m.Success) { return $null }
+    $record = Read-WorkshopRecord $m.Groups[1].Value
+    if ($record.ContainsKey($m.Groups[2].Value)) { return $record[$m.Groups[2].Value].manifest }
+    return $null
+}
+
 # Mods this PC can load, by packageId: the game's own (Core, DLCs), the Mods folder and the Workshop items of every
 # Steam library, with Steam's record of the version installed for each Workshop item.
 function Get-Inventory {
@@ -424,6 +436,7 @@ try {
     $wanted = New-Object System.Collections.Generic.List[string]
     $folders = @{}
     $missing = New-Object System.Collections.Generic.List[object]
+    $copies = New-Object System.Collections.Generic.List[object]
     $different = New-Object System.Collections.Generic.List[object]
     foreach ($m in $sessionMods) {
         $id = [string]$m.packageId
@@ -431,9 +444,15 @@ try {
         if ($m.source -eq 'workshop') {
             $wid = [string]$m.workshopId
             if ($wid -notmatch '^\d+$') { $problems.Add("$($m.name) : numéro Workshop invalide."); continue }
-            # A local folder with the same packageId would take Raysor's place: his mod is then the Workshop copy.
+            if (-not $inv.workshop.ContainsKey($wid)) {
+                # Not subscribed here. A copy in the Mods folder (RimSort with SteamCMD, by hand) keeps the mod active,
+                # but Steam never updates it and Multiplayer sees another source than Raysor's.
+                $wanted.Add($id)
+                if ($inv.local.ContainsKey($id)) { $folders[$id] = $inv.local[$id].folder; $copies.Add($m) } else { $missing.Add($m) }
+                continue
+            }
+            # Raysor's mod is the Workshop copy: a local folder with the same packageId would take its place.
             if ($inv.local.ContainsKey($id)) { $wanted.Add($id + '_steam') } else { $wanted.Add($id) }
-            if (-not $inv.workshop.ContainsKey($wid)) { $missing.Add($m); continue }
             $folders[$id] = $wid
             $mine = ''
             if ($inv.record.ContainsKey($wid)) { $mine = $inv.record[$wid].manifest }
@@ -465,6 +484,29 @@ try {
                     Start-Process "steam://url/CommunityFilePage/$($m.workshopId)"
                     Read-Host "  $($m.name) : clique sur « S'abonner » dans Steam, puis appuie sur Entrée" | Out-Null
                 }
+            }
+        }
+    }
+
+    if ($copies.Count -gt 0) {
+        Say ''
+        Say "$($copies.Count) mod(s) du Workshop de la liste de Raysor sont chez toi en copie dans le dossier Mods (RimSort avec SteamCMD, copie à la main), sans abonnement Steam :" Yellow
+        $older = 0
+        $shown = 0
+        foreach ($m in $copies) {
+            $mine = Get-LinkedManifest (Join-Path $RimWorldPath "Mods\$($folders[[string]$m.packageId])")
+            $note = ''
+            if ($mine -and $m.manifest -and $mine -ne $m.manifest) { $older++; $note = ' (autre version que chez Raysor)' }
+            if ($shown -lt 20 -or $note) { Say "  - $($m.name)$note : https://steamcommunity.com/sharedfiles/filedetails/?id=$($m.workshopId)" Yellow; $shown++ }
+        }
+        if ($copies.Count -gt $shown) { Say "  ... et $($copies.Count - $shown) autres." Yellow }
+        Say '  Steam ne met jamais ces copies à jour, et Multiplayer voit ta liste différente de celle de Raysor (local au lieu de Workshop).' Yellow
+        if ($older -gt 0) { Say "  $older copie(s) n'ont pas la version de Raysor : les fichiers diffèrent." Yellow }
+        $problems.Add("Abonne-toi sur Steam aux $($copies.Count) mod(s) en copie, attends que Steam les télécharge, puis relance Installer.bat : il activera la version Steam de chacun à la place de sa copie.")
+        if (-not $NoSteam -and -not $DryRun -and (Confirm-Step 'Ouvrir leurs pages dans Steam, une par une, pour t''y abonner ?')) {
+            foreach ($m in $copies) {
+                Start-Process "steam://url/CommunityFilePage/$($m.workshopId)"
+                Read-Host "  $($m.name) : clique sur « S'abonner » dans Steam, puis appuie sur Entrée" | Out-Null
             }
         }
     }
