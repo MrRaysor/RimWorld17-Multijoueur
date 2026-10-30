@@ -511,6 +511,8 @@ try {
     # Settings: Raysor's files, named after this PC's folder of each mod; files Raysor does not have are set aside
     # (the mod then uses its default settings, as at Raysor's).
     $settings = 0
+    # Mods whose settings differed: a clue when a desync follows.
+    $settingsMods = New-Object System.Collections.Generic.List[string]
     foreach ($m in $sessionMods) {
         $id = [string]$m.packageId
         if ($IgnoredConfigs -contains $id -or -not $folders.ContainsKey($id)) { continue }
@@ -526,11 +528,13 @@ try {
             $target = Join-Path $configDir $name
             if ((Test-Path -LiteralPath $target) -and (Test-SameFile $expected[$name] $target)) { continue }
             $settings++
+            if ($settingsMods -notcontains $m.name) { $settingsMods.Add($m.name) }
             if (-not $DryRun) { Backup-File $target; Copy-Item -LiteralPath $expected[$name] -Destination $target -Force }
         }
         foreach ($f in Get-ChildItem -LiteralPath $configDir -File -Filter "$myPrefix*.xml" -ErrorAction SilentlyContinue) {
             if ($expected.ContainsKey($f.Name)) { continue }
             $settings++
+            if ($settingsMods -notcontains $m.name) { $settingsMods.Add($m.name) }
             if (-not $DryRun) { Backup-File $f.FullName; Remove-Item -LiteralPath $f.FullName }
         }
     }
@@ -539,6 +543,7 @@ try {
         $target = Join-Path $DataPath 'HugsLib\ModSettings.xml'
         if (-not (Test-Path -LiteralPath $target) -or -not (Test-SameFile $source $target)) {
             $settings++
+            $settingsMods.Add('HugsLib')
             if (-not $DryRun) {
                 Backup-File $target
                 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
@@ -547,7 +552,7 @@ try {
         }
     }
     $changes += $settings
-    if ($settings -gt 0) { Say "Réglages : $settings fichier(s) alignés sur ceux de Raysor." } else { Say 'Réglages : déjà identiques.' }
+    if ($settings -gt 0) { Say "Réglages : $settings fichier(s) alignés sur ceux de Raysor ($($settingsMods -join ', '))." } else { Say 'Réglages : déjà identiques.' }
     if (-not $DryRun -and (Test-Path -LiteralPath $BackupDir)) { Say "Anciens fichiers sauvegardés dans : $BackupDir" DarkGray }
 
     Say ''
