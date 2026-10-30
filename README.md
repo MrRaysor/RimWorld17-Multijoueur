@@ -29,7 +29,11 @@ RimWorld fermé, relance `Installer.bat`. Il :
 - compare la version de chaque mod du Workshop avec celle de Raysor : s'il y a une différence, il propose de les
   faire retélécharger par Steam (Steam redémarre tout seul) ; s'il manque un mod, il propose d'ouvrir sa page Steam.
 
-Il doit finir par « Prêt ». Sinon, il dit quoi faire. Les fichiers qu'il remplace sont d'abord copiés dans le
+Il doit finir par « Prêt ». Sinon, il dit quoi faire.
+
+Les mods du Workshop doivent venir de ton abonnement Steam, pas d'une copie dans le dossier `Mods` (RimSort avec
+SteamCMD, copie à la main) : Steam ne met jamais ces copies à jour, et Multiplayer voit alors ta liste différente de celle
+de Raysor. L'installateur liste ces copies : abonne-toi à ces mods sur Steam, puis relance-le. Les fichiers qu'il remplace sont d'abord copiés dans le
 dossier `Sauvegardes session`, à côté de `Config` dans
 `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`.
 
