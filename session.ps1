@@ -95,28 +95,38 @@ function Test-RimWorldRunning {
     return [bool](Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($RimWorldPath, [StringComparison]::OrdinalIgnoreCase) })
 }
 
-# The mod's own packageId and name (not those of its dependency lists).
+# The mod's own packageId, name and supported game versions (not those of its dependency lists).
 function Read-About([string]$ModFolder) {
     $file = Join-Path $ModFolder 'About\About.xml'
     if (-not (Test-Path -LiteralPath $file)) { return $null }
     $id = $null
     $name = $null
+    $versions = @()
     try {
         $xml = New-Object Xml.XmlDocument
         $xml.LoadXml([IO.File]::ReadAllText($file))
         foreach ($node in $xml.DocumentElement.ChildNodes) {
             if ($node.LocalName -ieq 'packageId') { $id = $node.InnerText.Trim() }
             elseif ($node.LocalName -ieq 'name') { $name = $node.InnerText.Trim() }
+            elseif ($node.LocalName -ieq 'supportedVersions') { $versions = @($node.ChildNodes | ForEach-Object { $_.InnerText.Trim() }) }
         }
     } catch {
         # RimWorld reads some malformed About.xml anyway: take the packageId outside the dependency lists.
         $text = [regex]::Replace([IO.File]::ReadAllText($file), '(?s)<(modDependencies\w*|loadAfter\w*|loadBefore\w*|incompatibleWith\w*)>.*?</\1>', '')
         $m = [regex]::Match($text, '<packageId>\s*([^<]+?)\s*</packageId>', 'IgnoreCase')
         if ($m.Success) { $id = $m.Groups[1].Value }
+        $block = [regex]::Match($text, '(?s)<supportedVersions>(.*?)</supportedVersions>', 'IgnoreCase').Groups[1].Value
+        $versions = @([regex]::Matches($block, '<li>\s*([^<]+?)\s*</li>') | ForEach-Object { $_.Groups[1].Value })
     }
     if (-not $id) { return $null }
     if (-not $name) { $name = $id }
-    return @{ packageId = $id.ToLowerInvariant(); name = $name }
+    return @{ packageId = $id.ToLowerInvariant(); name = $name; versions = $versions }
+}
+
+# The game's version as mods declare it (1.7).
+function Get-GameMajorMinor {
+    $line = [string](Get-Content -LiteralPath (Join-Path $RimWorldPath 'Version.txt') -TotalCount 1 -ErrorAction SilentlyContinue)
+    return [regex]::Match($line, '^\d+\.\d+').Value
 }
 
 # Steam's record of the Workshop items installed in a library: content version (manifest) and its date.
@@ -170,7 +180,7 @@ function Get-Inventory {
             if ($inv.workshop.ContainsKey($d.Name)) { continue }
             $about = Read-About $d.FullName
             if (-not $about) { continue }
-            $inv.workshop[$d.Name] = @{ packageId = $about.packageId; name = $about.name }
+            $inv.workshop[$d.Name] = @{ packageId = $about.packageId; name = $about.name; versions = $about.versions }
             if (-not $inv.byPackage.ContainsKey($about.packageId)) { $inv.byPackage[$about.packageId] = @() }
             $inv.byPackage[$about.packageId] += $d.Name
         }
@@ -298,11 +308,14 @@ function Build-Session([string[]]$Active) {
             if ($inv.duplicates.ContainsKey($bare)) { $problems.Add("$($inv.local[$bare].name) : plusieurs copies dans Mods ($($inv.duplicates[$bare] -join ', ')), garde-n'en qu'une.") }
         } elseif ($inv.byPackage.ContainsKey($bare)) {
             $ids = @($inv.byPackage[$bare])
-            $wid = $ids[0]
+            # Several Workshop items with this packageId (2026-11-01: The Dead Man's Switch for 1.4-1.6 and its 1.7 item):
+            # RimWorld loads one; the one made for this game version, not the first folder by name.
+            $current = Get-GameMajorMinor
+            $wid = @($ids | Where-Object { $inv.workshop[$_].versions -contains $current }) + $ids | Select-Object -First 1
             $entry = [ordered]@{ packageId = $bare; name = $inv.workshop[$wid].name; source = 'workshop'; folder = $wid; workshopId = $wid; manifest = ''; timeupdated = '' }
             if ($inv.record.ContainsKey($wid)) { $entry.manifest = $inv.record[$wid].manifest; $entry.timeupdated = $inv.record[$wid].timeupdated }
             $mods.Add($entry)
-            if ($ids.Count -gt 1) { $problems.Add("$($entry.name) : plusieurs mods du Workshop ont l'identifiant $bare ($($ids -join ', ')), désabonne-toi de ceux que tu n'utilises pas.") }
+            if ($ids.Count -gt 1) { $problems.Add("$($entry.name) : plusieurs mods du Workshop ont l'identifiant $bare ($($ids -join ', ')), désabonne-toi de $((@($ids | Where-Object { $_ -ne $wid })) -join ', ') (celui de RimWorld $current est $wid).") }
         } else {
             $problems.Add("$id : mod actif introuvable sur ce PC.")
         }
@@ -454,6 +467,11 @@ try {
             # Raysor's mod is the Workshop copy: a local folder with the same packageId would take its place.
             if ($inv.local.ContainsKey($id)) { $wanted.Add($id + '_steam') } else { $wanted.Add($id) }
             $folders[$id] = $wid
+            # Another Workshop item with the same packageId: RimWorld loads only one of them, maybe not Raysor's.
+            $others = @($inv.byPackage[$id] | Where-Object { $_ -ne $wid })
+            if ($others.Count -gt 0) {
+                $problems.Add("$($m.name) : tu es aussi abonné à un autre mod du Workshop qui a le même identifiant ($($others -join ', ')) ; RimWorld n'en charge qu'un. Désabonne-toi de celui-là dans Steam (Raysor utilise $wid), puis relance Installer.bat.")
+            }
             $mine = ''
             if ($inv.record.ContainsKey($wid)) { $mine = $inv.record[$wid].manifest }
             if ($m.manifest -and $mine -ne $m.manifest) { $different.Add($m) }
